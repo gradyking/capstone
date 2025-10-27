@@ -1,0 +1,4 @@
+# trying to extract gene letters from the ranges
+library(tidyverse)
+
+clip_data <- read_tsv("20251017 Extracting DNA sequences/")
