@@ -55,9 +55,9 @@ names(peaksGRAnnotated) = mcols(peaksGRAnnotated)$GeneID
 
 peaksSAF = as.data.frame(peaksGRAnnotated) %>% dplyr::rename(Chr=seqnames, Start=start,End=end, Strand=strand)
 
-
+# this links to raw .bam files (4 GiB)
 targetsGene = read.table('targetsGene_input.txt', header=T,sep='\t')
-targetsPeak = read.table('targetsPeak_IP.txt', header=T,sep='\t')
+targetsPeak = read.table('targetsPeak_IP.txt', header=T,sep='\t') #400 MiB
 targets = bind_rows(targetsGene,targetsPeak)
 
 
@@ -84,12 +84,18 @@ deSet = DESeqDataSetFromMatrix(countData = ipCounts,
                               colData = targets,
                               rowRanges=peaksGRAnnotated[rownames(ipCounts)],
 #                               rowData = ipAnnotation,
-                              design= ~ Type + Group + Type:Group)
+                              design= ~ Type + Group + Type:Group) 
 
-deSet = DESeq(deSet, test="LRT", reduced= ~ Type + Group)
+# type RNA-seq or CLIP-seq
+# comparing CLIP-seq level versus RNA-seq level 
+# https://support.bioconductor.org/p/61509/#:~:text=To%20test%20for%20ratio%20of%20ratios%20using,DESeq(dds%2C%20test=%22LRT%22%2C%20reduced=%20~%20assay%20+%20condition)
+
+deSet = DESeq(deSet, test="LRT", reduced= ~ Type + Group) #likelihood ratio test
 resultsNames(deSet)  
 
 
+# pulls TypeIP.GroupFF
+# intercept, type_ip_vs_input, group_FF_vs_CRE, TypeIP.GroupFF (interaction)
 
 resGR = results(deSet, format="GRangesList", saveCols=c("symbol","miR","Score","description","gene_id"))
 
