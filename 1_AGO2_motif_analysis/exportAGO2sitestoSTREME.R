@@ -5,8 +5,8 @@ library(BSgenome.Mmusculus.UCSC.mm10)
 library(plyranges)
 library(ggdensity)
 
-clip_data <- read_tsv("diff_chimeric_clip.zip") %>%
-  filter(Feature == "3'-UTR") #filter to only sequences of interest
+clip_data <- read_tsv("1_AGO2_motif_analysis/diff_chimeric_clip.zip") %>%
+  dplyr::filter(Feature == "3'-UTR") #filter to only sequences of interest
 
 # data was pre-analyzed like in this paper https://www.biorxiv.org/content/10.1101/2022.02.13.480296v1.full
 # "symbol","miR","Score","description","gene_id" came from there
@@ -37,7 +37,7 @@ ggplot(clip_data, aes(padj)) + geom_histogram()
 ggplot(clip_data, aes(log2FoldChange)) + geom_histogram()
 
 clip_data_grouped <- clip_data %>%
-  filter(!(is.na(padj))) %>%
+  dplyr::filter(!(is.na(padj))) %>%
   # label whether the interaction increased, decreased, had no effect, or had a mixed effect
   # TODO: these are arbitrary cut-off values, must ask for revised numbers
   mutate(group = case_when(
@@ -48,7 +48,7 @@ clip_data_grouped <- clip_data %>%
   ))
 table(clip_data_grouped$group)
 
-clip_data_filtered <- clip_data_grouped %>% filter(group == "negative" | group == "control")
+clip_data_filtered <- clip_data_grouped %>% dplyr::filter(group == "negative" | group == "control")
 clip_granges <- clip_data_filtered %>% 
   as_granges()
 

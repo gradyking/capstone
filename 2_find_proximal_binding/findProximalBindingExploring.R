@@ -1,17 +1,13 @@
-library("dplyr")
-library("tidyr")
-library("stringr")
-library("plyranges")
 library("AnnotationHub")
-library(readr)
 
 library("BSgenome.Mmusculus.UCSC.mm10")
 library("Biostrings")
 library("BiocParallel")
 
-# BiocManager::install(listOfLibraries)
+library('tidyverse')
+library("plyranges")
 
-setwd("2_find_proximal_binding")
+# BiocManager::install(listOfLibraries)
 
 ## multiporcessing parameters
 param <- MulticoreParam(workers = 30, progressbar = TRUE)
@@ -31,41 +27,44 @@ selectSeqLevels<-seqlevels(proteinGenes)[str_detect(seqlevels(proteinGenes),rege
 proteinGenes<-proteinGenes %>% dplyr::filter(seqnames %in% selectSeqLevels)
 seqlevels(proteinGenes)<-selectSeqLevels
 
-temp <- threeUTRsByTranscript(ensDB,filter= ~ tx_biotype == "protein_coding") %>%
-  unlist()
-sort(table(names(temp)), decreasing=TRUE)[1:20]
-
-# taken from https://www.bioconductor.org/packages/devel/bioc/vignettes/IRanges/inst/doc/IRangesOverview.pdf
-# idk why this function isn't just built-in to IRanges
-plotRanges <- function(x, xlim=x, main=deparse(substitute(x)), col="black", sep=0.5, ...)
-{
-  height <- 1
-  if (is(xlim, "IntegerRanges"))
-    xlim <- c(min(start(xlim)), max(end(xlim)))
-  bins <- disjointBins(IRanges(start(x), end(x) + 1))
-  plot.new()
-  plot.window(xlim, c(0, max(bins)*(height + sep)))
-  ybottom <- bins * (sep + height) - height
-  rect(start(x)-0.5, ybottom, end(x)+0.5, ybottom + height, col=col, ...)
-  title(main)
-  axis(1)
-}
-# plotRanges(IRanges(c(5,6), c(10,11))) # testing the function
-
-# no overlap on any of these??
-plotRanges((temp[names(temp) == "ENSMUST00000000001"]@ranges))
-plotRanges((temp[names(temp) == "ENSMUST00000178006"]@ranges))
-plotRanges((temp[names(temp) == "ENSMUST00000204457"]@ranges))
-plotRanges((temp[names(temp) == "ENSMUST00000179598"]@ranges))
-
-# oh boy some of the UTRs overlap with different UTRs of other genes
-sort(countOverlaps(temp@ranges, drop.self=TRUE), decreasing=TRUE)[1:10]
-
-# worst example is 20488 which overlaps with 59 UTRs from 58 other genes
-lookup <- findOverlaps(temp@ranges, drop.self=TRUE)
-i <- which(names(temp) == "ENSMUST00000020488")
-j <- lookup[lookup@from == i]@to
-plotRanges((temp[c(i,j)]@ranges), main = "ENSMUST00000020488 overlaps with 59 others")
+# temp <- threeUTRsByTranscript(ensDB,filter= ~ tx_biotype == "protein_coding") %>%
+#   unlist()
+# 
+# # temp2 <- threeUTRsByTranscript(ensDB, 'tx_biotype') %>% unlist()
+# # sort(table(names(temp)), decreasing=TRUE)
+# # sum(table(names(temp)) > 2)
+# 
+# # taken from https://www.bioconductor.org/packages/devel/bioc/vignettes/IRanges/inst/doc/IRangesOverview.pdf
+# # idk why this function isn't just built-in to IRanges
+# plotRanges <- function(x, xlim=x, main=deparse(substitute(x)), col="black", sep=0.5, ...)
+# {
+#   height <- 1
+#   if (is(xlim, "IntegerRanges"))
+#     xlim <- c(min(start(xlim)), max(end(xlim)))
+#   bins <- disjointBins(IRanges(start(x), end(x) + 1))
+#   plot.new()
+#   plot.window(xlim, c(0, max(bins)*(height + sep)))
+#   ybottom <- bins * (sep + height) - height
+#   rect(start(x)-0.5, ybottom, end(x)+0.5, ybottom + height, col=col, ...)
+#   title(main)
+#   axis(1)
+# }
+# # plotRanges(IRanges(c(5,6), c(10,11))) # testing the function
+# 
+# # no overlap on any of these??
+# plotRanges((temp[names(temp) == "ENSMUST00000000001"]@ranges))
+# plotRanges((temp[names(temp) == "ENSMUST00000178006"]@ranges)) # many exons after the end of the transcript -> would be degraded by non-sense mediated decay almost immediately
+# plotRanges((temp[names(temp) == "ENSMUST00000204457"]@ranges))
+# plotRanges((temp[names(temp) == "ENSMUST00000179598"]@ranges))
+# 
+# # oh boy some of the UTRs overlap with different UTRs of other genes
+# sort(countOverlaps(temp@ranges, drop.self=TRUE), decreasing=TRUE)[1:10]
+# 
+# # worst example is 20488 which overlaps with 59 UTRs from 58 other genes
+# lookup <- findOverlaps(temp@ranges, drop.self=TRUE)
+# i <- which(names(temp) == "ENSMUST00000020488")
+# j <- lookup[lookup@from == i]@to
+# plotRanges((temp[c(i,j)]@ranges), main = "ENSMUST00000020488 overlaps with 59 others")
 
 # but this is fine, right? i'm just filtering the .bams based on whether its within any UTR, doesn't really matter the particular gene
 
@@ -80,8 +79,11 @@ seqlevels(threeUTRs)<-selectSeqLevels
 ###########################################
 ## read the AGO2 differential (wild-type vs musashi-1 knockout)
 
-clip_data <- read_tsv("diff_chimeric_clip.zip") %>%
+clip_data <- read_tsv("2_find_proximal_binding/diff_chimeric_clip.zip") %>%
   dplyr::filter(Feature == "3'-UTR")
+
+# ggplot(clip_data, aes(padj, log2FoldChange)) + geom_point(alpha = 0.05)
+# ggplot(clip_data, aes(padj, baseMean)) + geom_point(alpha = 0.05)
 
 # split into regulated and unregulated
 clip_data_grouped <- clip_data %>%
@@ -95,7 +97,10 @@ clip_data_grouped <- clip_data %>%
     TRUE ~ "middle" # for all other cases
   ))
 
-clipAGOGR <- makeGRangesFromDataFrame(clip_data_grouped, seqnames.field="seqnames", start.field='start', end.field='end', strand.field='strand', keep.extra.columns=T)
+table(clip_data_grouped$group)
+
+clipAGOGR <- makeGRangesFromDataFrame(clip_data_grouped, seqnames.field="seqnames", start.field='start', end.field='end', strand.field='strand', keep.extra.columns=T) %>%
+  mutate(peak = gsub(" ", "", peak))
 
 # negativeregulatedAGO2 <- clip_data_grouped %>% dplyr::filter(group == "negative")
 # positiveregulatedAGO2 <- clip_data_grouped %>% dplyr::filter(group == "posi")
@@ -104,9 +109,9 @@ clipAGOGR <- makeGRangesFromDataFrame(clip_data_grouped, seqnames.field="seqname
 #######################################################################
 
 ## read the musashi-1 eCLIP 
-MSI_peaks = read.table(file="MSI1-with_input.regions.ucsc.bed",header=F,stringsAsFactors=F,sep="\t")
+MSI_peaks = read.table(file="2_find_proximal_binding/MSI1-with_input.regions.ucsc.bed",header=F,stringsAsFactors=F,sep="\t")
 colnames(MSI_peaks) = c("Chr","Start","End","Scores","ScoreSum","Strand")
-MSI_peaks <- MSI_peaks %>% tidyr::unite(GeneID, c(Chr,Start,End,Strand), remove=F) 
+MSI_peaks <- MSI_peaks %>% mutate(peakName = paste(Chr, ":", Start, "-", End, Strand,sep =""))
 
 ## convert to genomics ranges so that we can collapse the overlaps and intersect the UTRs
 
@@ -148,7 +153,9 @@ compared <- Msi_Ago %>% mutate(dist = AGO_center-MSI_center) %>%
   dplyr::filter(abs(dist) == min(abs(dist)))
 
 compared %>% ggplot(aes(group, dist)) + geom_point()
-compared %>% dplyr::filter(abs(dist) < 5000, group %in% c('negative', 'positive')) %>% ggplot(aes(dist)) + geom_histogram() + facet_wrap(~ group)
+
+
+compared %>% dplyr::filter(abs(dist) < 50, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram(binwidth=1) + facet_wrap(~ group)
 
 compared %>% dplyr::filter(abs(dist) < 5000, group %in% c('negative', 'control')) %>% ungroup() %>% summarise(p_val = t.test(dist ~ group)$p.value)
 
@@ -171,3 +178,131 @@ TukeyHSD(anova)
 # potentially expand to nearest n sites
 
 # more complex analysis for farther interactions? even possible?
+
+############################################################
+############################################################
+############################################################
+# the above analysis has bad resolution-- the peaks are much wider than the true binding sites
+# stoilov did a computational method to find "seeds" in the AGO2 peaks for the associated microRNAs
+# i need to find the UAG binding sites within the musashi peaks
+
+# mm10 and GRCm38 are the same?
+genome(MSI_GR) = "mm10"
+MSI_GR <- MSI_GR %>% mutate(sequence=getSeq(BSgenome.Mmusculus.UCSC.mm10, .))
+
+# find UAG binding sites ((G/A)U_n AGU, n=1 to 3) https://www.tandfonline.com/doi/full/10.1128/MCB.21.12.3888-3900.2001
+# str_locate_all(as.character(MSI_GR$sequence), "TAG")
+mean(str_count(as.character(MSI_GR$sequence), "TAGT") > 0)
+mean(str_count(as.character(MSI_GR$sequence), "TAG") > 0)
+# hmmm, only 28% of the binding sites contain UAG
+
+# wait, so this sequence is from the original DNA, right? the mRNA would be the reverse complement, right?
+# 5' UAG 3'
+# 3' AUC 5' -> 5' CTA 3' (DNA)
+mean(str_count(as.character(MSI_GR$sequence), "CTA") > 0)
+# still only 16% of binding sites have UAG.
+# well i can simply continue and fix it later if it's wrong
+
+# some have more than one match. for those, i will expand the search to be the above (G/A) U_n AGU, which would be
+# 5' (G/A) U_n AGU 3'
+# 3' (C/U) A_n UCA 5' -> 5' ACT A_n C/T 3' DNA
+# which can be expressed in regex as ACTA{1,3}[CT]
+
+# about 3.1% have more than one match to the UAG motif
+mean(str_count(as.character(MSI_GR$sequence), "CTA") > 1)
+table(str_count(as.character(MSI_GR$sequence), "CTA"))
+
+# only 45 have more than one match for the full musashi motif
+mean(str_count(as.character(MSI_GR$sequence), "ACTA{1,3}[CT]") > 1)
+table(str_count(as.character(MSI_GR$sequence), "ACTA{1,3}[CT]"))
+
+# get UAG motif locations
+MSI_GR$matches <- str_locate_all(as.character(MSI_GR$sequence), "CTA")
+
+# to remove the duplicates, I would ideally to get the site nearest the high point of the peak on the graph
+# but i don't think that's accessible unfortunately. i'll take the one nearest the center for now
+
+# find which have more than 1 match
+idxmoreThanOne <- which(sapply(MSI_GR$matches, dim)[1,] > 1)
+idxequalsOne <- which(sapply(MSI_GR$matches, dim)[1,] == 1)
+
+
+# extract from MSI_GR to avoid queries & writing to large dataframe
+matches_list <- MSI_GR$matches
+
+# stupid fix to get rid of nested matrices inside lists for those with only one match
+matches_list[idxequalsOne] <- lapply(idxequalsOne, function(x) matches_list[[x]][1,])
+widths <- width(MSI_GR)
+for(i in idxmoreThanOne){
+  if(i %% 100 == 0) cat(i, "\n")
+  
+  # find which match is closest to the peak center
+  match <- matches_list[[i]]
+  
+  # find centers of motifs (generalized in case motif length changes)
+  centers <- floor((match[,2] + match[,1]) / 2)
+  
+  # find center of peak, find which is closest
+  peakCenter <-  floor((widths[i] + 1) / 2)
+  idxMin <- which.min(abs(centers-peakCenter))
+  
+  # rewrite match to be the best match (list is because for some reason the matches are in lists)
+  matches_list[i] <- list(match[idxMin,])
+}
+
+# put new de-duplicated matches (as lists) back into column
+MSI_GR$matches <- matches_list
+
+# no more duplicates!
+table(sapply(MSI_GR$matches, length)/2)
+
+# ok i will filter to those with a motif
+MSI_motifGR <- MSI_GR %>% 
+  dplyr::filter(sapply(.$matches, length) > 0)
+
+# now matches has the location relative to the beginning of the string, where the first index is 1
+# but i need a GRange relative to the original genome
+# so, if a sequence starts at 100, and the UAG motif is at 3 to 5, 
+# 100, 101, 102, 103, 104
+# 1,   2,   3,   4,   5
+# the gene location would be 100 + 3 - 1 = 102 to 100 + 5 - 1 = 104
+
+starts <- start(MSI_motifGR)
+start(MSI_motifGR) <- starts + sapply(MSI_motifGR$matches, "[[", 1) - 1
+end(MSI_motifGR) <- starts + sapply(MSI_motifGR$matches, "[[", 2) - 1
+
+# now the GRanges contain the correct absolute location on the genome!
+
+###################
+# import stoilov's AGO2 seeds
+threeUTRSeeds <- readRDS("0_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")$UTR3_peaks
+# obtain the group for each peak from the clipAGOGR dataframe
+threeUTRSeeds <- threeUTRSeeds %>% 
+  as.tibble() %>%
+  mutate(AGO_center = floor((end + start)/2)) %>%
+  right_join(clipAGOGR %>% as.tibble(), join_by("peakName" == "peak"))
+
+mean(is.na(threeUTRSeeds$group)) # cool, no NAs
+
+MSI_motifGR <- MSI_motifGR %>% 
+                as.tibble() %>% 
+                mutate(MSI_center = floor((end + start)/2))
+
+# join on the UTRID, which is called segmentName in the RDS
+Msi_Agoprecise <- inner_join(MSI_motifGR, threeUTRSeeds, 
+                             by=join_by("UTRID" == "segmentName"), 
+                             relationship = "many-to-many")
+
+compared <- Msi_Agoprecise %>% mutate(dist = AGO_center-MSI_center) %>%
+  group_by(UTRID, group) %>%
+  dplyr::filter(abs(dist) == min(abs(dist)))
+
+compared %>% ggplot(aes(group, dist)) + geom_point()
+
+compared %>% dplyr::filter(abs(dist) < 100, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram() + facet_wrap(~ group)
+ggsave("highPreciseCloseHist.png")
+
+compared %>% dplyr::filter(abs(dist) < 3000, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram() + facet_wrap(~ group)
+ggsave("highPreciseFarHist.png")
+
+compared %>% dplyr::filter(abs(dist) < 3000, group %in% c('negative', 'control')) %>% ungroup() %>% summarise(p_val = t.test(dist ~ group)$p.value)
