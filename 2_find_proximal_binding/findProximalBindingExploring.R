@@ -108,7 +108,7 @@ clipAGOGR <- makeGRangesFromDataFrame(clip_data_grouped, seqnames.field="seqname
 
 #######################################################################
 
-## read the musashi-1 eCLIP 
+## read the musashi-1 eCLIP, made by PureCLIP
 MSI_peaks = read.table(file="2_find_proximal_binding/MSI1-with_input.regions.ucsc.bed",header=F,stringsAsFactors=F,sep="\t")
 colnames(MSI_peaks) = c("Chr","Start","End","Scores","ScoreSum","Strand")
 MSI_peaks <- MSI_peaks %>% mutate(peakName = paste(Chr, ":", Start, "-", End, Strand,sep =""))
@@ -135,7 +135,7 @@ seqlevels(MSI_GR)<-selectSeqLevels
 
 ##############################################
 # filter binding sites to only ones in 3'-UTRs
-MSI_GR = MSI_GR %>% join_overlap_intersect_directed(threeUTRs)
+# MSI_GR = MSI_GR %>% join_overlap_intersect_directed(threeUTRs)
 
 MSI_GR_table = as.tibble(MSI_GR) %>% 
   mutate(MSI_center = as.integer((end +start)/2)) %>%
@@ -217,48 +217,58 @@ mean(str_count(as.character(MSI_GR$sequence), "ACTA{1,3}[CT]") > 1)
 table(str_count(as.character(MSI_GR$sequence), "ACTA{1,3}[CT]"))
 
 # get UAG motif locations
-MSI_GR$matches <- str_locate_all(as.character(MSI_GR$sequence), "CTA")
+MSI_GR$matches <- str_locate_all(as.character(MSI_GR$sequence), "TAG")
 
-# to remove the duplicates, I would ideally to get the site nearest the high point of the peak on the graph
-# but i don't think that's accessible unfortunately. i'll take the one nearest the center for now
-
-# find which have more than 1 match
-idxmoreThanOne <- which(sapply(MSI_GR$matches, dim)[1,] > 1)
-idxequalsOne <- which(sapply(MSI_GR$matches, dim)[1,] == 1)
-
-
-# extract from MSI_GR to avoid queries & writing to large dataframe
-matches_list <- MSI_GR$matches
-
-# stupid fix to get rid of nested matrices inside lists for those with only one match
-matches_list[idxequalsOne] <- lapply(idxequalsOne, function(x) matches_list[[x]][1,])
-widths <- width(MSI_GR)
-for(i in idxmoreThanOne){
-  if(i %% 100 == 0) cat(i, "\n")
-  
-  # find which match is closest to the peak center
-  match <- matches_list[[i]]
-  
-  # find centers of motifs (generalized in case motif length changes)
-  centers <- floor((match[,2] + match[,1]) / 2)
-  
-  # find center of peak, find which is closest
-  peakCenter <-  floor((widths[i] + 1) / 2)
-  idxMin <- which.min(abs(centers-peakCenter))
-  
-  # rewrite match to be the best match (list is because for some reason the matches are in lists)
-  matches_list[i] <- list(match[idxMin,])
-}
-
-# put new de-duplicated matches (as lists) back into column
-MSI_GR$matches <- matches_list
-
-# no more duplicates!
-table(sapply(MSI_GR$matches, length)/2)
-
-# ok i will filter to those with a motif
 MSI_motifGR <- MSI_GR %>% 
-  dplyr::filter(sapply(.$matches, length) > 0)
+  as_tibble() %>% 
+  rowwise() %>% 
+  reframe(matches = split(matches, row(matches)),
+          seqnames = seqnames,
+          start = start,
+          end = end,
+          width = width,
+          strand = strand) %>%
+  as_granges()
+# # to remove the duplicates, I would ideally to get the site nearest the high point of the peak on the graph
+# # but i don't think that's accessible unfortunately. i'll take the one nearest the center for now
+# 
+# # find which have more than 1 match
+# idxmoreThanOne <- which(sapply(MSI_GR$matches, dim)[1,] > 1)
+# idxequalsOne <- which(sapply(MSI_GR$matches, dim)[1,] == 1)
+# 
+# 
+# # extract from MSI_GR to avoid queries & writing to large dataframe
+# matches_list <- MSI_GR$matches
+# 
+# # stupid fix to get rid of nested matrices inside lists for those with only one match
+# matches_list[idxequalsOne] <- lapply(idxequalsOne, function(x) matches_list[[x]][1,])
+# widths <- width(MSI_GR)
+# for(i in idxmoreThanOne){
+#   if(i %% 100 == 0) cat(i, "\n")
+#   
+#   # find which match is closest to the peak center
+#   match <- matches_list[[i]]
+#   
+#   # find centers of motifs (generalized in case motif length changes)
+#   centers <- floor((match[,2] + match[,1]) / 2)
+#   
+#   # find center of peak, find which is closest
+#   peakCenter <-  floor((widths[i] + 1) / 2)
+#   idxMin <- which.min(abs(centers-peakCenter))
+#   
+#   # rewrite match to be the best match (list is because for some reason the matches are in lists)
+#   matches_list[i] <- list(match[idxMin,])
+# }
+# 
+# # put new de-duplicated matches (as lists) back into column
+# MSI_GR$matches <- matches_list
+# 
+# # no more duplicates!
+# table(sapply(MSI_GR$matches, length)/2)
+# 
+# # ok i will filter to those with a motif
+# MSI_motifGR <- MSI_GR %>% 
+#   dplyr::filter(sapply(.$matches, length) > 0)
 
 # now matches has the location relative to the beginning of the string, where the first index is 1
 # but i need a GRange relative to the original genome
@@ -276,33 +286,54 @@ end(MSI_motifGR) <- starts + sapply(MSI_motifGR$matches, "[[", 2) - 1
 ###################
 # import stoilov's AGO2 seeds
 threeUTRSeeds <- readRDS("0_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")$UTR3_peaks
+
+# find groups from chimeric data
+clip_data <- read_tsv("2_find_proximal_binding/diff_chimeric_clip.zip")
+
+# split into regulated and unregulated
+clip_data_grouped <- clip_data %>%
+  dplyr::filter(!(is.na(padj))) %>%
+  # label whether the interaction increased, decreased, had no effect, or had a mixed effect
+  # TODO: these are arbitrary cut-off values, must ask for revised numbers
+  mutate(group = case_when(
+    (padj < 0.05) & (log2FoldChange < 0) ~ "negative",
+    (padj < 0.05) & (log2FoldChange > 0) ~ "positive",
+    (padj > 0.90) & (baseMean > 120) ~ "control",
+    TRUE ~ "middle" # for all other cases
+  ))
+
+clipAGOGR <- makeGRangesFromDataFrame(clip_data_grouped, seqnames.field="seqnames", start.field='start', end.field='end', strand.field='strand', keep.extra.columns=T) %>%
+  mutate(peak = gsub(" ", "", peak))
+
 # obtain the group for each peak from the clipAGOGR dataframe
-threeUTRSeeds <- threeUTRSeeds %>% 
+AGOGRWithGroup <- threeUTRSeeds %>% 
+  # as.tibble() %>%
+  # mutate(AGO_center = floor((end + start)/2)) %>%
+  join_overlap_inner_directed(clipAGOGR) %>%
   as.tibble() %>%
-  mutate(AGO_center = floor((end + start)/2)) %>%
-  right_join(clipAGOGR %>% as.tibble(), join_by("peakName" == "peak"))
+  mutate(AGO_center = floor((end + start)/2))
 
-mean(is.na(threeUTRSeeds$group)) # cool, no NAs
+mean(is.na(AGOGRWithGroup$group)) # cool, no NAs
 
-MSI_motifGR <- MSI_motifGR %>% 
-                as.tibble() %>% 
-                mutate(MSI_center = floor((end + start)/2))
+MSI_motifGR <- MSI_motifGR %>% join_overlap_inner_directed(threeUTRs) %>% as.tibble() %>% mutate(MSI_center = floor((end + start)/2))
 
 # join on the UTRID, which is called segmentName in the RDS
-Msi_Agoprecise <- inner_join(MSI_motifGR, threeUTRSeeds, 
+Msi_Agoprecise <- inner_join(MSI_motifGR, AGOGRWithGroup, 
                              by=join_by("UTRID" == "segmentName"), 
                              relationship = "many-to-many")
 
 compared <- Msi_Agoprecise %>% mutate(dist = AGO_center-MSI_center) %>%
-  group_by(UTRID, group) %>%
+  group_by(seedName, group) %>% #MISTAKE: grouping by UTRID instead of peakName or seedName, since multiple AGO2 sites can be in one UTR
   dplyr::filter(abs(dist) == min(abs(dist)))
 
-compared %>% ggplot(aes(group, dist)) + geom_point()
+compared %>% group_by(group) %>% summarize(n=dplyr::n())
 
-compared %>% dplyr::filter(abs(dist) < 100, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram() + facet_wrap(~ group)
+compared %>% dplyr::filter(group %in% c('negative', 'control')) %>% ggplot(aes(group, dist)) + geom_violin()
+
+compared %>% dplyr::filter(abs(dist) < 100, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram(binwidth=1) + facet_wrap(~ group)
 ggsave("highPreciseCloseHist.png")
 
-compared %>% dplyr::filter(abs(dist) < 3000, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram() + facet_wrap(~ group)
+compared %>% dplyr::filter(abs(dist) < 1000, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram(binwidth=5) + facet_wrap(~ group, scales = "free_y")
 ggsave("highPreciseFarHist.png")
 
 compared %>% dplyr::filter(abs(dist) < 3000, group %in% c('negative', 'control')) %>% ungroup() %>% summarise(p_val = t.test(dist ~ group)$p.value)
