@@ -4,16 +4,17 @@ library("stringr")
 library("plyranges") 
 library("AnnotationHub")
 library("ggplot2")
-library("openxlsx")
-library("mirbase.db")
-library("ggforce")
+# library("openxlsx")
+# library("mirbase.db")
+# library("ggforce")
 
-library("scanMiR")
-library("scanMiRData")
+# library("scanMiR")
+# library("scanMiRData")
 library("BSgenome.Mmusculus.UCSC.mm10")
 library("Biostrings")
 library("BiocParallel")
-library(miRBaseConverter)
+# library("miRBaseConverter")
+# library("rstatix")
 
 ## Wraps the findSeedMatches function
 ## Takes a genomic range (peak
@@ -45,11 +46,6 @@ findSeed2 = function(GR) {
     seqlevels(scan) = seqlevels(GR)
     return(scan)
   }
-filteredGR[13]
-
-findSeed2(filteredGR[13])
-
-seedMatches = bplapply( split(filteredGR[1:10]), findSeed2,BPPARAM = param)
 
 
 ## multiporcessing parameters
@@ -211,4 +207,239 @@ peaksList[["UTR3_peaks"]] %>% as.data.frame() %>% dplyr::select(-entrezid) %>% w
 
 
 
+################################################################################################################################################
+############################################################################################################################################
+## temp copy to recreate threeUTRs starting from this point in the code
+ah<-AnnotationHub()
+qr<-query(ah, c("EnsDb", "GRCm38"))
 
+ensDB<-qr[["AH89211"]]
+seqlevelsStyle(ensDB)<-"UCSC"
+
+threeUTRs<-threeUTRsByTranscript(ensDB,filter= ~ tx_biotype == "protein_coding") %>%
+  unlist() %>% mutate(transcriptID = names(.)) %>%
+  reduce_ranges_directed(transcriptID = paste(transcriptID, collapse=";")) %>% # merges overlapping UTRs
+  mutate(UTRID = paste(seqnames,":", start,"-",end, strand, sep=""))
+
+# standard chromosomes only
+selectSeqLevels<-paste0("chr", c(1:19, "X", "Y"))
+threeUTRs<-threeUTRs %>% dplyr::filter(seqnames %in% selectSeqLevels)
+seqlevels(threeUTRs)<-selectSeqLevels
+
+
+## recover from saved RDS
+seedsList = readRDS("0_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")
+## read 
+difClip = read_tsv("1_AGO2_motif_analysis/diff_chimeric_clip.zip")
+
+## add differential CLIP data from MSI1/MSI2 knockout
+difClip = difClip %>% 
+          dplyr::select(seqnames, start, end, width, strand, log2FoldChange, padj) %>%
+          dplyr::filter(!is.na(padj))
+difClip = makeGRangesFromDataFrame(difClip, keep.extra.columns = T)
+
+
+UTR3_seeds  = join_overlap_inner_directed(seedsList[["UTR3_peaks"]] , difClip) %>%
+              #mcols(.) %>%
+              as.data.frame() %>% 
+              rename(all_of(c( start = "seed.start", end = "seed.end", width = "seed.width")))
+
+
+## grab the MSI1 cross-link sites and build peaks by expansing the sites with 10nt in each direction and overlapping them
+
+## read the cross-link sites
+MSI1_sites = read.table("0_stoilov_microRNA_seed_mapping_with_genomic_locations/MSI1-with_input.sites.ucsc.bed", header = F)
+colnames(MSI1_sites )<-c("seqnames","start","end","state","score","strand")
+MSI1_sites = makeGRangesFromDataFrame(MSI1_sites, keep.extra.columns = T)
+
+## generate peaks by grabing a sequences cenetered on the cross-link sites and then reducing the overlaps
+MSI1_peaks = MSI1_sites %>% plyranges::stretch(8) %>% reduce_ranges_directed(score = sum(score), n.xlink.sites=n())
+
+
+## find the UAG sites in the peaks
+MSI1_peaks = MSI1_peaks %>% mutate(sequence = getSeq(BSgenome.Mmusculus.UCSC.mm10, .),
+                                    names = paste(seqnames,start,end,strand, sep = ":"))
+names(MSI1_peaks$sequence) = MSI1_peaks$names
+
+
+UAG_pos = vmatchPattern("TAG", MSI1_peaks$sequence) %>% unlist() %>% as.data.frame()
+
+##what fraction of the peaks has a UAG?
+sum(names(MSI1_peaks$sequence) %in% UAG_pos$names)/length(MSI1_peaks)
+
+
+## Annotate the UAG poistions with UTR data
+UAG_pos = UAG_pos %>% 
+            tidyr::separate(names, into = c("seqnames","seq.start","seq.end", "strand"), convert = T, sep =":", remove = F) %>% 
+            dplyr::mutate(start = start+seq.start, end = end+seq.start) %>%
+            makeGRangesFromDataFrame(., keep.extra.columns = F)
+
+## UAGs in 3' UTRS
+UTR3_UAG = join_overlap_inner_directed(UAG_pos,threeUTRs) %>% 
+            as.data.frame() %>%
+            rename(all_of(c( start = "UAG.start", end = "UAG.end", width = "UAG.width")))
+            
+### Merge the seeds and UAG tables and calculate the distances
+### Keep the distances integers
+CLIP_x_table = inner_join(UTR3_seeds, UTR3_UAG, by = c("segmentName" = "UTRID", "strand" = "strand", "seqnames" = "seqnames"), relationship = "many-to-many") %>%
+              dplyr::mutate(distance = floor((UAG.start+UAG.end)/2 - (seed.start+seed.end)/2), absolute.distance = abs(distance))
+              
+### annotate the regulation
+CLIP_x_table = CLIP_x_table %>% dplyr::mutate(regulation = ifelse(padj<0.05 & log2FoldChange<0 , "downregulated", "undetermined"), 
+                               regulation = ifelse(padj<0.05 & log2FoldChange>0 , "upregulated", regulation), 
+                               regulation = ifelse(padj>0.95 & abs(log2FoldChange)<0.1 , "notregulated", regulation))
+
+                               
+## Histogram plots of the UAGs relative to the seed
+ ggplot(CLIP_x_table, aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-10000,10000) + facet_wrap(~regulation, scales = "free_y")
+ 
+ 
+ggplot(CLIP_x_table, aes(x = regulation, y = distance)) + geom_violin() + ylim(-10000,10000) 
+
+ 
+## Find the UAGs closest to the seed
+tmp = CLIP_x_table %>% dplyr::group_by(seedName, regulation) %>% dplyr::summarise(absolute.distance = min(absolute.distance)) 
+
+summaryCLIP_x_table = left_join(tmp, CLIP_x_table, by = c("seedName" = "seedName", "regulation" = "regulation", "absolute.distance" = "absolute.distance"))
+summaryCLIP_x_table %>% dplyr::group_by(regulation) %>% dplyr::summarise(n= dplyr::n())
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>%
+ggplot( aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-1000,1000) + facet_wrap(~regulation, scales = "free_y")
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% #dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
+ggplot( aes(x = regulation, y = distance)) + geom_violin() + ylim(-1000,1000)
+
+## Same as above but group by peak instead of seed, as one peak can have more than one seeds
+tmp = CLIP_x_table %>% dplyr::group_by(peakName, regulation) %>% dplyr::summarise(absolute.distance = min(absolute.distance)) 
+
+summaryCLIP_x_table = left_join(tmp, CLIP_x_table, by = c("peakName" = "peakName", "regulation" = "regulation", "absolute.distance" = "absolute.distance"))
+
+summaryCLIP_x_table %>% dplyr::group_by(regulation) %>% dplyr::summarise(n= dplyr::n())
+
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% #dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
+ggplot( aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-1000,1000) + facet_wrap(~regulation, scales = "free_y") + theme_clean()
+
+## match the sample sizes
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
+ggplot( aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-1000,1000) + facet_wrap(~regulation, scales = "free_y")
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
+ggplot( aes(x = regulation, y = distance)) + geom_violin() #+ ylim(-500,500)
+
+
+### stats
+summaryCLIP_x_table %>% ungroup() %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>%  rstatix::t_test(distance ~ regulation)
+
+summaryCLIP_x_table %>% ungroup() %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>% aov(distance ~ regulation, data =.) %>% summary()
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>% ungroup()  %>% var.test(distance ~ regulation, data =.)
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>% dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>% ungroup()  %>% var.test(distance ~ regulation, data =.)
+
+
+
+
+############################
+## As abovem but using Msi1 cross linking sites
+## straight cross-link sites
+
+MSI1_sites = read.table("0_stoilov_microRNA_seed_mapping_with_genomic_locations/MSI1-with_input.sites.ucsc.bed", header = F)
+colnames(MSI1_sites ) = c("seqnames","start","end","state","score","strand")
+MSI1_sites = makeGRangesFromDataFrame(MSI1_sites, keep.extra.columns = T)
+
+## annotate the x-link sites with the UTR data
+UTR3_MSI = join_overlap_inner_directed(MSI1_sites,threeUTRs) %>% 
+            as.data.frame()  %>%
+            rename(all_of(c( start = "MSI.start", end = "MSI.end", width = "MSI.width")))
+            
+## combine the miRNA seeds with the MSI1 x-link sites
+CLIP_x_table = inner_join(UTR3_seeds, UTR3_MSI, by = c("segmentName" = "UTRID", "strand" = "strand", "seqnames" = "seqnames"), relationship = "many-to-many") %>%
+              dplyr::mutate(distance = floor(MSI.start - (seed.start+seed.end)/2), absolute.distance = abs(distance))
+
+## annotate the regulation
+CLIP_x_table = CLIP_x_table %>% dplyr::mutate(regulation = ifelse(padj<0.05 & log2FoldChange<0 , "downregulated", "undetermined"), 
+                               regulation = ifelse(padj<0.05 & log2FoldChange>0 , "upregulated", regulation), 
+                               regulation = ifelse(padj>0.95 & abs(log2FoldChange)<0.1 , "notregulated", regulation),
+                               distance.bin = cut_interval(distance, length=10))
+
+ggplot(CLIP_x_table, aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-10000,10000) + facet_wrap(~regulation, scales = "free_y")
+ggplot(CLIP_x_table, aes(x = regulation, y = distance)) + geom_violin() + ylim(-1000,1000) 
+
+
+CLIP_x_table %>% dplyr::group_by(distance, regulation) %>% dplyr::summarise(score = sum(score)/dplyr::n()) %>%
+ggplot( aes(x = distance, y= score)) + geom_line() + xlim(-10000,10000) + facet_wrap(~regulation) #, scales = "free_y")
+
+CLIP_x_table %>% dplyr::group_by(distance, regulation) %>% dplyr::summarise(score = sum(score)/dplyr::n()) %>%
+ggplot( aes(x = distance, y= score)) + geom_smooth(method = "loess", span=0.2) + xlim(-1000,1000) + facet_wrap(~regulation) #, scales = "free_y")
+
+CLIP_x_table %>% dplyr::group_by(distance, regulation) %>% dplyr::summarise(score = sum(score)/dplyr::n()) %>% 
+ggplot( aes(x = distance, y= score)) + geom_smooth(method = "loess", span=0.2) + xlim(-1000,1000) + facet_wrap(~regulation) #, scales = "free_y")
+
+CLIP_x_table %>% dplyr::group_by(regulation) %>% dplyr::summarise(n=dplyr::n())
+
+## distance from miRNA seed seed
+tmp = CLIP_x_table %>% dplyr::group_by(seedName, regulation) %>% dplyr::summarise(absolute.distance = min(absolute.distance)) 
+
+summaryCLIP_x_table = left_join(tmp, CLIP_x_table, by = c("seedName" = "seedName", "regulation" = "regulation", "absolute.distance" = "absolute.distance"))
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>%
+ggplot( aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-1000,1000) + facet_wrap(~regulation, scales = "free_y")
+
+summaryCLIP_x_table %>% dplyr::group_by(distance, regulation) %>% dplyr::summarise(score = sum(score)/dplyr::n()) %>%
+ggplot( aes(x = distance, y= score)) + geom_line() + xlim(-500,500) + facet_wrap(~regulation, scales = "free_y")
+
+summaryCLIP_x_table %>% dplyr::group_by(distance, regulation) %>% dplyr::summarise(score = sum(score)/dplyr::n()) %>%
+ggplot( aes(x = distance, y= score)) + geom_smooth(method = "loess", span=0.1, se=F) + xlim(-1000,1000) + facet_wrap(~regulation) #, scales = "free_y")
+
+summaryCLIP_x_table %>% dplyr::group_by(regulation) %>% dplyr::summarise(n=dplyr::n())
+
+## The shortest distance from miRNA seed in an Ago2 peak - some peaks may have more than one seed
+
+tmp = CLIP_x_table %>% dplyr::group_by(peakName, regulation) %>% dplyr::summarise(absolute.distance = min(absolute.distance)) 
+
+summaryCLIP_x_table = left_join(tmp, CLIP_x_table, by = c("peakName" = "peakName", "regulation" = "regulation", "absolute.distance" = "absolute.distance"))
+
+summaryCLIP_x_table %>% dplyr::group_by(regulation) %>% dplyr::summarise(n= dplyr::n())
+
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>%
+ggplot( aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-1000,1000) + facet_wrap(~regulation) #, scales = "free_y")
+#
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% 
+ggplot( aes(x = regulation, y = distance)) + geom_violin() #+ ylim(-500,500)
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
+ggplot( aes(x = regulation, y = distance)) + geom_violin() + labs(x = "AGO2 Regulation", y="Distance Between Closest AGO2/Msi-1 Pair") + theme_minimal()
+  #+ ylim(-500,500)
+ggsave("0_stoilov_microRNA_seed_mapping_with_genomic_locations/varianceLower.svg")
+
+
+summaryCLIP_x_table %>% dplyr::group_by(distance, regulation) %>% dplyr::summarise(score = sum(score)/dplyr::n()) %>%
+ggplot( aes(x = distance, y= score)) + geom_smooth(method = "loess", span=0.1, se=F) + xlim(-1000,1000) + facet_wrap(~regulation) #, scales = "free_y")
+
+#
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
+ggplot( aes(x = regulation, y = score)) + geom_boxplot() #+ ylim(-500,500)
+
+
+
+summaryCLIP_x_table %>% dplyr::group_by(regulation) %>% dplyr::summarise(n=dplyr::n())
+
+
+summaryCLIP_x_table %>% ungroup() %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>%  rstatix::t_test(score ~ regulation)
+
+summaryCLIP_x_table %>% ungroup() %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>%  rstatix::t_test(distance ~ regulation)
+
+summaryCLIP_x_table %>% ungroup() %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>% aov(distance ~ regulation, data =.) %>% summary()
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>% ungroup()  %>% var.test(distance ~ regulation, data =.)
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>% ungroup() %>% group_by(regulation) %>% summarize(var = var(distance))
+qf(0.975, 203, 1516)
+qf(0.025, 203, 1516)
+
+
+summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") )  %>% dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>% ungroup()  %>% var.test(distance ~ regulation, data =.)
+
+
+summaryCLIP_x_table %>% dplyr::group_by(regulation) %>% dplyr::summarise(dist = mean(distance))
