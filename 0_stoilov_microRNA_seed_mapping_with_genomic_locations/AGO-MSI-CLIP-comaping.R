@@ -1,6 +1,7 @@
 library("dplyr")
 library("tidyr")
 library("stringr")
+library("readr")
 library("plyranges") 
 library("AnnotationHub")
 library("ggplot2")
@@ -318,7 +319,7 @@ summaryCLIP_x_table %>% dplyr::group_by(regulation) %>% dplyr::summarise(n= dply
 
 
 summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% #dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
-ggplot( aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-1000,1000) + facet_wrap(~regulation, scales = "free_y") + theme_clean()
+ggplot( aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-1000,1000) + facet_wrap(~regulation, scales = "free_y") + theme_minimal()
 
 ## match the sample sizes
 summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
@@ -409,6 +410,8 @@ ggplot( aes(x = distance)) + geom_histogram(binwidth = 5) + xlim(-1000,1000) + f
 summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% 
 ggplot( aes(x = regulation, y = distance)) + geom_violin() #+ ylim(-500,500)
 
+# round(runif(1) * .Machine$integer.max) yields 1422383798
+set.seed(1422383798) #reproducible sample
 summaryCLIP_x_table %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% dplyr::group_by(regulation) %>% dplyr::slice_sample(n=207) %>%
 ggplot( aes(x = regulation, y = distance)) + geom_violin() + labs(x = "AGO2 Regulation", y="Distance Between Closest AGO2/Msi-1 Pair") + theme_minimal()
   #+ ylim(-500,500)
