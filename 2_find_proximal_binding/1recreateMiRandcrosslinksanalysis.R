@@ -2,6 +2,8 @@ library("AnnotationHub")
 library("tidyverse")
 library("plyranges")
 
+# essentially merging 2/0findProximalBindingExploring and 0_2/AGO-MSI-CLIP-comaping.R
+
 ah<-AnnotationHub()
 qr<-query(ah, c("EnsDb", "GRCm38"))
 

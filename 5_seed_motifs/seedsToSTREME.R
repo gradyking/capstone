@@ -8,7 +8,6 @@ clip_data <- read_tsv("2_find_proximal_binding/diff_chimeric_clip.zip") %>%
 clip_data_grouped <- clip_data %>%
   dplyr::filter(!(is.na(padj))) %>%
   # label whether the interaction increased, decreased, had no effect, or had a mixed effect
-  # TODO: these are arbitrary cut-off values, must ask for revised numbers
   mutate(regulation = case_when(
     (padj < 0.05) & (log2FoldChange < 0) ~ "downregulated",
     (padj < 0.05) & (log2FoldChange > 0) ~ "upregulated",
@@ -26,7 +25,7 @@ seeds <- readRDS("0_2_stoilov_microRNA_seed_mapping_with_genomic_locations/mappe
 # there are duplicate miR and seedName
 as_tibble(seeds@elementMetadata@listData) %>% dplyr::summarize(n=dplyr::n(), .by = c(miR, seedName)) %>% arrange(desc(n))
 
-as_tibble(seeds@elementMetadata@listData) %>% filter(miR == "mmu-miR-124-3p", seedName == "chr18:37841491-37841498+")
+# as_tibble(seeds@elementMetadata@listData) %>% filter(miR == "mmu-miR-124-3p", seedName == "chr18:37841491-37841498+")
 # ohh the geneID is different. i don't care about that. remove the duplicate rows https://stackoverflow.com/a/46656891
 seedsDedup <- seeds %>% as_tibble %>% .[!duplicated(.[ , c("miR","seedName")]),] %>% makeGRangesFromDataFrame(keep.extra.columns=T)
 
