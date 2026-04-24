@@ -44,7 +44,7 @@ clipAGOGR <- makeGRangesFromDataFrame(clip_data_grouped, seqnames.field="seqname
   mutate(peak = gsub(" ", "", peak))
 
 ## recover from saved RDS
-seedsList = readRDS("0_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")
+seedsList = readRDS("0_2_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")
 
 UTR3_seeds  = join_overlap_inner_directed(seedsList[["UTR3_peaks"]] , clipAGOGR) %>%
   #mcols(.) %>%
@@ -54,7 +54,7 @@ UTR3_seeds  = join_overlap_inner_directed(seedsList[["UTR3_peaks"]] , clipAGOGR)
 #########################
 # read the Msi-1 cross-linking regions
 
-MSI1_sites = read.table("0_stoilov_microRNA_seed_mapping_with_genomic_locations/MSI1-with_input.sites.ucsc.bed", header = F)
+MSI1_sites = read.table("0_2_stoilov_microRNA_seed_mapping_with_genomic_locations/MSI1-with_input.sites.ucsc.bed", header = F)
 colnames(MSI1_sites ) = c("seqnames","start","end","state","score","strand")
 MSI1_sites = makeGRangesFromDataFrame(MSI1_sites, keep.extra.columns = T)
 
@@ -89,7 +89,7 @@ summaryCLIP_x_table %>% dplyr::filter(Sregulation %in% c("downregulated","notreg
   ggplot( aes(x = Sregulation, y = distance)) + geom_violin() + labs(x = "AGO2 Regulation", y="Distance Between Closest AGO2/Msi-1 Pair", title="notregulated = (padj>0.95) & abs(log2FoldChange)<0.1") + theme_minimal()
 
 # looks the same with his regulation definition
-stoilovOriginal = read_tsv("0_stoilov_microRNA_seed_mapping_with_genomic_locations/stoilovFinalComparisonTable.tsv")
+stoilovOriginal = read_tsv("0_2_stoilov_microRNA_seed_mapping_with_genomic_locations/stoilovFinalComparisonTable.tsv")
 stoilovOriginal %>% dplyr::filter(regulation %in% c("downregulated","notregulated") ) %>% dplyr::group_by(regulation) %>% 
   # dplyr::slice_sample(n=207) %>%
   ggplot( aes(x = regulation, y = distance)) + geom_violin() + labs(x = "AGO2 Regulation", y="Distance Between Closest AGO2/Msi-1 Pair") + theme_minimal()

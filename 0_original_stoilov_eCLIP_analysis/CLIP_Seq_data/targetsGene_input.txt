@@ -1,7 +1,0 @@
-Target	Group	Replicate	Type	File
-files/Input6	CRE	Rep3	Input	../files/files_rep3/input_CRE_S31_R1_001.adapterTrim.round2.rmRep.sorted.rmDup.sorted.bam
-files/Input5	FF	Rep3	Input	../files/files_rep3/input_F_F_S32_R1_001.adapterTrim.round2.rmRep.sorted.rmDup.sorted.bam
-files/Input1	FF	Rep1	Input	../files/files/Input1_FF_Rep1_S21_R1_001.adapterTrim.round2.rmRep.sorted.rmDup.sorted.bam
-files/Input2	CRE	Rep1	Input	../files/files/Input2_CRE_Rep1_S22_R1_001.adapterTrim.round2.rmRep.sorted.rmDup.sorted.bam
-files/Input3	FF	Rep2	Input	../files/files/Input3_FF_Rep2_S23_R1_001.adapterTrim.round2.rmRep.sorted.rmDup.sorted.bam
-files/Input4	CRE	Rep2	Input	../files/files/Input4_CRE_Rep2_S24_R1_001.adapterTrim.round2.rmRep.sorted.rmDup.sorted.bam

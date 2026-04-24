@@ -1,8 +1,0 @@
-Target	Group	Replicate	Type	File
-files/IP6	CRE	Rep3	IP	../files/files_rep3/IP_Cre_S27_R1_001.reverse_mir_alignments.filtered.chimeric_candidates.STARAligned.outSo.rmDup.bam
-files/IP5	FF	Rep3	IP	../files/files_rep3/IP_F_F_S28_R1_001.reverse_mir_alignments.filtered.chimeric_candidates.STARAligned.outSo.rmDup.bam
-files/IP1	FF	Rep1	IP	../files/files/IP1_FF_Rep1_S17_R1_001.reverse_mir_alignments.filtered.chimeric_candidates.STARAligned.outSo.rmDup.bam
-files/IP2	CRE	Rep1	IP	../files/files/IP2_CRE_Rep1_S18_R1_001.reverse_mir_alignments.filtered.chimeric_candidates.STARAligned.outSo.rmDup.bam
-files/IP3	FF	Rep2	IP	../files/files/IP3_FF_Rep2_S19_R1_001.reverse_mir_alignments.filtered.chimeric_candidates.STARAligned.outSo.rmDup.bam
-files/IP4	CRE	Rep2	IP	../files/files/IP4_CRE_Rep2_S20_R1_001.reverse_mir_alignments.filtered.chimeric_candidates.STARAligned.outSo.rmDup.bam
-

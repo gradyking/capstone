@@ -1,0 +1,16 @@
+"metric","value","p"
+"absolute.distance.p",3.65e-34,1e-05
+"anova.absolute.distance.Df",1,NA
+"anova.absolute.distance.F",24.0433266638082,NA
+"anova.absolute.distance.p",1.03076313235737e-06,1e-05
+"anova.distance.Df",1,NA
+"anova.distance.F",0.0101416200368997,NA
+"anova.distance.p",0.919795901015316,0.93746
+"anova.score.Df",1,NA
+"anova.score.F",103.916367223191,NA
+"anova.score.p",9.83560222019607e-24,1e-05
+"distance.p",0.801,0.84738
+"mean.absolute.distance.difference",-104.886964080293,0.00153
+"mean.distance.difference",-2.35964623159745,0.46942
+"mean.score.difference",14.7263257205033,5e-05
+"score.p",2.84e-09,1e-05

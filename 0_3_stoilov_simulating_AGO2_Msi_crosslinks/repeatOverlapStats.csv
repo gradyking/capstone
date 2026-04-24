@@ -1,0 +1,5 @@
+"","Region","Total.Peaks","Peaks.in.repeats"
+"1","UTR3_peaks",17783,2781
+"2","UTR5_peaks",1153,100
+"3","intron_peaks",6620,4838
+"4","CDS_peaks",11081,329

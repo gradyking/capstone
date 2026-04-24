@@ -285,7 +285,7 @@ end(MSI_motifGR) <- starts + sapply(MSI_motifGR$matches, "[[", 2) - 1
 
 ###################
 # import stoilov's AGO2 seeds
-threeUTRSeeds <- readRDS("0_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")$UTR3_peaks
+threeUTRSeeds <- readRDS("0_2_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")$UTR3_peaks
 
 # find groups from chimeric data
 clip_data <- read_tsv("2_find_proximal_binding/diff_chimeric_clip.zip")
