@@ -333,10 +333,10 @@ compared %>% group_by(group) %>% summarize(n=dplyr::n())
 compared %>% dplyr::filter(group %in% c('negative', 'control')) %>% ggplot(aes(group, dist)) + geom_violin()
 
 compared %>% dplyr::filter(abs(dist) < 100, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram(binwidth=1) + facet_wrap(~ group)
-ggsave("highPreciseCloseHist.png")
+ggsave("2_find_proximal_binding/highPreciseCloseHist.png")
 
 compared %>% dplyr::filter(abs(dist) < 1000, group %in% c('negative', 'control')) %>% ggplot(aes(dist)) + geom_histogram(binwidth=5) + facet_wrap(~ group, scales = "free_y")
-ggsave("highPreciseFarHist.png")
+ggsave("2_find_proximal_binding/highPreciseFarHist.png")
 
 compared %>% dplyr::filter(abs(dist) < 3000, group %in% c('negative', 'control')) %>% ungroup() %>% summarise(p_val = t.test(dist ~ group)$p.value)
 
