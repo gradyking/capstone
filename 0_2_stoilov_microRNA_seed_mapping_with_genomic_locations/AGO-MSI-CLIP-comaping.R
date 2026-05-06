@@ -69,10 +69,10 @@ library("BiocParallel")
 # #                      "UTR5_peaksGN"  #peaks in the 5' UTR - mapped from genome to transcript data and then back to genome to remove duplicates
 #                      )
 # 
-# ## gather anotation and other external data we need
-# data(mmu, package = "scanMiRData")
-# ah<-AnnotationHub()
-# qr<-query(ah, c("EnsDb", "GRCm38"))
+## gather anotation and other external data we need
+data(mmu, package = "scanMiRData")
+ah<-AnnotationHub()
+qr<-query(ah, c("EnsDb", "GRCm38"))
 # 
 # ensDB<-qr[["AH89211"]]
 # seqlevelsStyle(ensDB)<-"UCSC"
@@ -353,6 +353,9 @@ MSI1_sites = makeGRangesFromDataFrame(MSI1_sites, keep.extra.columns = T)
 UTR3_MSI = join_overlap_inner_directed(MSI1_sites,threeUTRs) %>% 
             as.data.frame()  %>%
             rename(all_of(c( start = "MSI.start", end = "MSI.end", width = "MSI.width")))
+
+# finding how many 3'-UTR Msi-1 "peaks" for the paper
+join_overlap_inner_directed(MSI1_sites,threeUTRs) %>% plyranges::stretch(8) %>% reduce_ranges_directed(score = sum(score), n.xlink.sites=n()) %>% length()
             
 ## combine the miRNA seeds with the MSI1 x-link sites
 CLIP_x_table = inner_join(UTR3_seeds, UTR3_MSI, by = c("segmentName" = "UTRID", "strand" = "strand", "seqnames" = "seqnames"), relationship = "many-to-many") %>%

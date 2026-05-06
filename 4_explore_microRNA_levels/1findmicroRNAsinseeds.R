@@ -7,7 +7,7 @@ library(plyranges)
 
 # extract 3'UTR seeds, remove duplicate gene info
 seeds <- readRDS("0_2_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")$UTR3_peaks
-seedsNoDuplicate <- seeds %>% as_tibble %>% .[!duplicated(.[ , c("miR","seedName")]),] %>% makeGRangesFromDataFrame(keep.extra.columns=T)
+seedsNoDuplicate <- seeds %>% as_tibble %>% .[!duplicated(.[ , c("peakName", "miR","seedName")]),] %>% makeGRangesFromDataFrame(keep.extra.columns=T)
 
 # count number of miRs in seeds table
 length(table(seedsNoDuplicate$miR))
@@ -90,3 +90,6 @@ miRsinSeedsbyRegulation %>%
     size = 3, hjust=0
   ) +
   expand_limits(y = 2.6)
+
+# is this significant? do permutation. take all seeds, make two random groups (match in size)
+# repeat 100000x, what ratio is more/less than you'd expect to get? make distribution of ratios, which are too far out in the tails?

@@ -56,3 +56,14 @@ intersect <- FIMO36f %>% join_overlap_intersect_directed(FIMO37f)
 left37 %>% as_tibble() %>% View()
 
 UTR3_seeds_with_matches <- UTR3_seeds_down %>% makeGRangesFromDataFrame(keep.extra.columns=T) %>% join_overlap_inner_directed(FIMO37f)
+
+
+
+##########################
+# motifs found match mmu-mir-124 plus degeneracy where mir-182, 183, 96 are similar sequence except for a few at the beginning
+# analysis works, but uhhh not exactly interesting!
+
+# perhaps expand to 
+# most UAGs are within 20 (average)-50 nucleotides (75%)
+# maybe mask seed itself
+# ehh mostly similar to 1_peak analysis anyways
