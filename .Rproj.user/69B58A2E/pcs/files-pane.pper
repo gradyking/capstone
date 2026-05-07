@@ -2,8 +2,8 @@
     "sortOrder": [
         {
             "columnIndex": 2,
-            "ascending": false
+            "ascending": true
         }
     ],
-    "path": "~/Documents/Capstone Stoilov/2_find_proximal_binding"
+    "path": "~/Documents/Capstone Stoilov/4_explore_microRNA_levels"
 }

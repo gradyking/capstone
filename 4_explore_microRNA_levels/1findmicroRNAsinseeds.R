@@ -84,12 +84,23 @@ miRsinSeedsbyRegulation %>%
   filter(n > 10) %>%
   ggplot(aes(x = miR.x, y = rel_downvsnotratio)) + geom_col() +
   coord_flip() + theme_minimal() +
-  labs(y = "relative ratio of binding, downregulated / not regulated") + 
+  labs(y = "relative ratio of binding, downregulated / not regulated", x="") + 
   geom_text(
     aes(y = 2.5,label = paste0("n=", n)),
     size = 3, hjust=0
   ) +
   expand_limits(y = 2.6)
+ggsave("4_explore_microRNA_levels/differentBindingOfMicroRNAs.png", width = 6, height = 6, unit = "in")
 
 # is this significant? do permutation. take all seeds, make two random groups (match in size)
 # repeat 100000x, what ratio is more/less than you'd expect to get? make distribution of ratios, which are too far out in the tails?
+
+
+# the miR with high ratio tend to have UAG while the others do not
+# proving this?
+# trimer differential
+
+library("scanMiRData")
+
+data(mmu, package = "scanMiRData")
+mmu[["mmu-miR-16-5p"]]$mirseq

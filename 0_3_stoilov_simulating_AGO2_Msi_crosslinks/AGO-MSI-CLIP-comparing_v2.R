@@ -5,7 +5,7 @@ library("plyranges")
 library("AnnotationHub")
 library("ggplot2")
 # library("openxlsx")
-library("mirbase.db")
+#library("mirbase.db")
 library("ggforce")
 
 library("scanMiR")
@@ -13,7 +13,7 @@ library("scanMiRData")
 library("BSgenome.Mmusculus.UCSC.mm10")
 library("Biostrings")
 library("BiocParallel")
-library("miRBaseConverter")
+#library("miRBaseConverter")
 library("rstatix")
 library("forcats")
 library("ggpubr")
@@ -89,11 +89,11 @@ seqlevelsStyle(ensDB)<-"UCSC"
 
 
 proteinGenes<-genes(ensDB, columns=c("gene_id","symbol","description","entrezid"), filter= ~ gene_biotype == "protein_coding") %>% 
-          plyranges::filter(!is.na(entrezid), !is.na(gene_id))
+  dplyr::filter(!is.na(entrezid), !is.na(gene_id))
 selectSeqLevels<-seqlevels(proteinGenes)[str_detect(seqlevels(proteinGenes),regex("^chr.*[0-9XY]"))]
 
 
-proteinGenes<-proteinGenes %>% plyranges::filter(seqnames %in% selectSeqLevels)
+proteinGenes<-proteinGenes %>% dplyr::filter(seqnames %in% selectSeqLevels)
 seqlevels(proteinGenes)<-selectSeqLevels
 
 
@@ -102,7 +102,7 @@ threeUTRs<-threeUTRsByTranscript(ensDB,filter= ~ tx_biotype == "protein_coding")
             reduce_ranges_directed() %>%
             mutate(segmentName = paste(seqnames, ":", start, "-", end, strand, sep =""))
 
-threeUTRs<-threeUTRs %>% plyranges::filter(seqnames %in% selectSeqLevels)
+threeUTRs<-threeUTRs %>% dplyr::filter(seqnames %in% selectSeqLevels)
 seqlevels(threeUTRs)<-selectSeqLevels
 
 allGenes = genes(ensDB, columns=c("gene_id","symbol","description","entrezid"))
@@ -220,9 +220,9 @@ peaksList %>% saveRDS("mapped_miRNA_seeds.rds")
 ################################################################################################################################################
 ############################################################################################################################################
 ## recover from saved RDS
-seedsList = readRDS("mapped_miRNA_seeds.rds")
+seedsList = readRDS("0_2_stoilov_microRNA_seed_mapping_with_genomic_locations/mapped_miRNA_seeds.rds")
 ## read 
-difClip = read.table(file = "../diff_chimeric_clip.tsv", header = T) 
+difClip = read_tsv("1_AGO2_motif_analysis/diff_chimeric_clip.zip")
 
 ## add differential CLIP data from MSI1/MSI2 knockout
 difClip = difClip %>% 
@@ -249,7 +249,7 @@ names(threeUTRseq$sequence) = threeUTRseq$names
 ## Compare to Msi1 cross-linking sites
 
 
-MSI1_sites = read.table("/projects/Retina/CLIP/Pureclip/out/with_input/MSI1-with_input.sites.ucsc.bed", header = F)
+MSI1_sites = read.table("0_2_stoilov_microRNA_seed_mapping_with_genomic_locations/MSI1-with_input.sites.ucsc.bed", header = F)
 colnames(MSI1_sites ) = c("seqnames","start","end","state","score","strand")
 MSI1_sites = makeGRangesFromDataFrame(MSI1_sites, keep.extra.columns = T)
 
@@ -296,7 +296,7 @@ p = plot_data%>%
         #geom_col(position = position_dodge()) +
         geom_pointrange(aes(y= score, ymin = score -se, ymax = score + se), size =0.04)+ 
         #scale_x_discrete(labels = plot_data$bin)+
-        themeCustom()+
+        # themeCustom()+
           scale_color_viridis_d(option="turbo",  begin = .25, end =0.75)+
           scale_x_discrete(breaks = function(x){x[c(T,F)]}, guide = guide_axis(minor.ticks = TRUE))+
         theme(axis.text.x = element_markdown(size = 6, angle = 60, vjust = 1, hjust=1, face = "bold"),
@@ -313,7 +313,7 @@ p = plot_data%>%
              y = "MSI1 cross-link site score") 
         
 p = p+  stat_pvalue_manual(sig_data, x="bin" , label = "p.adj.signif", hide.ns = T, remove.bracket = T, size=2)
-ggsave("MSI1-xLinks_relative_to_miRNA-seed_sigLabel.png", plot = p, width = 1600, height = 800, units = "px")
+ggsave("0_3_stoilov_simulating_AGO2_Msi_crosslinks/MSI1-xLinks_relative_to_miRNA-seed_sigLabel.png", plot = p, width = 1600, height = 800, units = "px")
 
 plot_stat_data = left_join(plot_data, t_statistics, by = "distance.bin") %>% ungroup() %>% mutate(`-Log<sub>10</sub>(p.adj)` = ifelse(regulation == "Downregulated<br>peaks", -log10(p.adj),10))
 p = plot_stat_data%>%
