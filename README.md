@@ -1,5 +1,9 @@
-0_original_stoilov_eCLIP_analysis- this is Dr. Stoilov's original analysis that took the raw eCLIP data and converted it into the log2fold change values that say whether a given site has increased or decreased expression in wild-type versus musashi-knockout mice retina (ex https://docs.google.com/presentation/d/1PBdGpurhb_1PfgskNvP_xEdXGA5mWcI4Xn6PcWc3jnw/edit?slide=id.g344fe5f4614_0_49#slide=id.g344fe5f4614_0_49)
+This is the supporting code repository for my WVU undergrad capstone project "Analysis of AGO2/Musashi protein interactions in mouse photoreceptor cells". In order to comply with funding, the data is unfortunately not yet publicly available. It is anticipated to be publicly posted later in 2026. 
 
-1_AGO2_motif_analysis- this is my analysis splitting the AGO2 binding sites by regulated (AGO2 binding changes between wild-type and mus1 knockout) versus unregulated sites. most of the AGO2 binding sites had lowered binding when musashi is present, so i 
-1) exported the DNA of sites with lower AGO2 binding levels (inputSeq.fasta) versus no change in AGO2 binding levels (controlSeq.fasta), then 
-2) put those DNA segments into STREME which can find motifs (a sequence of letters more commonly found in the input versus control). the results of that are in "STREME outputs", where we found the AUUAA motif. 
+Figure 6 (Differentially enriched chimeric-Ago2 eCLIP peaks
+(Musashi knockout / wild-type) was generated in 0_0_original_stoilov_eCLIP_analysis/difClip.R.
+Figure 10 (Score vs Distance From AGO2 microRNA Seed) was generated in 0_3_stoilov_simulating_AGO2_Msi_crosslinks/AGO-MSI-CLIP-comparing_v2.R.
+Figure 11 (Example Binomial Distribution) was generated in 1_AGO2_motif_analysis/binomial/binomialPlot.R.
+Figure 12 (STREME motif discovery results) is a direct screenshot from 1_AGO2_motif_analysis/STREME outputs/20251205 3-8 motifs.html
+Figure 13 (Preliminary Results: Ratio of Binding in Down-
+regulated / Not Regulated Sites) was generated in 4_explore_microRNA_levels/1findmicroRNAsinseeds.R.
